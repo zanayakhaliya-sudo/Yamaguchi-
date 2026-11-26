@@ -1,0 +1,623 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Twice: Tsutomu Yamaguchi</title>
+<meta name="description" content="A stick-figure animated short about Tsutomu Yamaguchi, who survived both atomic bombs in 1945. A dramatised retelling of a true story.">
+<style>
+  :root {
+    --bg: #f4efe6;
+    --panel: #ffffff;
+    --text: #2a2622;
+    --muted: #6d655c;
+    --line: #ddd4c6;
+    --accent: #a8432a;
+    --btn: #2a2622;
+    --btn-text: #f4efe6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #16140f; --panel: #211e19; --text: #ece5d8; --muted: #a39a8c;
+      --line: #3a342c; --accent: #e07a5a; --btn: #ece5d8; --btn-text: #16140f;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #16140f; --panel: #211e19; --text: #ece5d8; --muted: #a39a8c;
+    --line: #3a342c; --accent: #e07a5a; --btn: #ece5d8; --btn-text: #16140f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.5 Georgia, "Times New Roman", serif;
+  }
+  main { max-width: 1000px; margin: 0 auto; padding: 20px 16px 40px; }
+  header h1 { margin: 0; font-size: 1.6rem; letter-spacing: .02em; }
+  header p { margin: 4px 0 16px; color: var(--muted); font-size: .95rem; }
+  .stage {
+    position: relative; width: 100%; aspect-ratio: 16 / 9;
+    background: #000; border-radius: 10px; overflow: hidden;
+    box-shadow: 0 6px 24px rgba(0,0,0,.18);
+  }
+  canvas { display: block; width: 100%; height: 100%; }
+  .overlay {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 14px;
+    background: rgba(20,18,15,.55); color: #f4efe6; text-align: center; padding: 16px;
+  }
+  .overlay[hidden] { display: none; }
+  .overlay button { font-size: 1.15rem; padding: 12px 28px; }
+  .overlay small { opacity: .85; max-width: 34em; }
+  .caption {
+    min-height: 5.2em; margin: 14px 0 10px; padding: 12px 16px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+    font-size: 1.05rem;
+  }
+  .caption .num { color: var(--accent); font-size: .8rem; letter-spacing: .08em; text-transform: uppercase; display: block; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  button {
+    font: inherit; cursor: pointer; border: 0; border-radius: 6px;
+    background: var(--btn); color: var(--btn-text); padding: 8px 14px; min-width: 44px;
+  }
+  button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  label.voice { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; color: var(--muted); }
+  .bar { flex-basis: 100%; height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; margin-top: 6px; display: flex; gap: 2px; }
+  .bar span { flex: 1; background: transparent; position: relative; cursor: pointer; }
+  .bar span i { position: absolute; inset: 0; width: 0; background: var(--accent); }
+  .bar span::before { content: ""; position: absolute; inset: 0; background: var(--line); filter: brightness(.92); }
+  footer { margin-top: 22px; color: var(--muted); font-size: .85rem; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Twice</h1>
+    <p>The story of Tsutomu Yamaguchi, who survived both atomic bombs in 1945. A dramatised retelling of a true story.</p>
+  </header>
+
+  <div class="stage">
+    <canvas id="c" width="960" height="540" aria-label="Animation"></canvas>
+    <div class="overlay" id="start">
+      <button id="startBtn" type="button">▶ Play</button>
+      <small>16 scenes, about 2½ minutes. Tick “Voice-over” below to hear narration (uses your browser’s speech voice). Keys: Space = play/pause, ← → = scenes.</small>
+    </div>
+  </div>
+
+  <div class="caption" aria-live="polite"><span class="num" id="num">Scene 1 of 16</span><span id="cap"></span></div>
+
+  <div class="controls">
+    <button id="prev" type="button" aria-label="Previous scene">⏮</button>
+    <button id="play" type="button" aria-label="Play or pause">▶</button>
+    <button id="next" type="button" aria-label="Next scene">⏭</button>
+    <button id="restart" type="button" aria-label="Restart">↺</button>
+    <label class="voice"><input type="checkbox" id="voice"> Voice-over</label>
+    <div class="bar" id="bar"></div>
+  </div>
+
+  <footer>
+    Events follow published accounts of Yamaguchi’s life; scenes, gestures and timings are simplified and dramatised.
+    No graphic imagery is shown.
+  </footer>
+</main>
+
+<script>
+(() => {
+  const W = 960, H = 540;
+  const cv = document.getElementById('c');
+  const ctx = cv.getContext('2d');
+  const INK = '#2b2723', PAPER = '#f3ead8';
+
+  function resize() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const r = cv.getBoundingClientRect();
+    cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
+    ctx.setTransform(cv.width / W, 0, 0, cv.height / H, 0, 0);
+  }
+
+  // ---------- helpers ----------
+  const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+  const lerp = (a, b, k) => a + (b - a) * k;
+  const ease = k => { k = clamp(k); return k * k * (3 - 2 * k); };
+  const seg = (t, a, b) => clamp((t - a) / (b - a));
+  function rng(seed) { let s = (seed * 7919 + 104729) % 2147483647 || 1; for (let i = 0; i < 4; i++) s = (s * 16807) % 2147483647; return () => (s = (s * 16807) % 2147483647) / 2147483647; }
+  function mix(c1, c2, k) {
+    const p = c => [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16));
+    const a = p(c1), b = p(c2);
+    return '#' + a.map((v, i) => Math.round(lerp(v, b[i], clamp(k))).toString(16).padStart(2, '0')).join('');
+  }
+  function sky(c1, c2) {
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, c1); g.addColorStop(1, c2);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  }
+  function rect(x, y, w, h, c) { ctx.fillStyle = c; ctx.fillRect(x, y, w, h); }
+  function ground(y, c) { rect(0, y, W, H - y, c); ctx.strokeStyle = INK; ctx.lineWidth = 2; line(0, y, W, y); }
+  function line(x1, y1, x2, y2) { ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); }
+  function circle(x, y, r, fill, stroke) {
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
+    if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+    if (stroke) { ctx.strokeStyle = stroke; ctx.stroke(); }
+  }
+  function text(str, x, y, size, color, align = 'center', alpha = 1, font = 'Georgia, serif', weight = '') {
+    ctx.save(); ctx.globalAlpha = clamp(alpha); ctx.fillStyle = color;
+    ctx.font = `${weight} ${size}px ${font}`; ctx.textAlign = align; ctx.textBaseline = 'middle';
+    ctx.fillText(str, x, y); ctx.restore();
+  }
+  function tag(str, alpha = 1) { // place / date label, top-left
+    ctx.save(); ctx.globalAlpha = clamp(alpha);
+    ctx.font = 'italic 22px Georgia, serif';
+    const w = ctx.measureText(str).width;
+    ctx.fillStyle = 'rgba(243,234,216,.85)'; ctx.fillRect(20, 18, w + 24, 36);
+    ctx.fillStyle = INK; ctx.textBaseline = 'middle'; ctx.fillText(str, 32, 37);
+    ctx.restore();
+  }
+  function hills(base, amp, color, seed = 1, off = 0) {
+    ctx.fillStyle = color; ctx.beginPath(); ctx.moveTo(0, H);
+    for (let x = 0; x <= W; x += 8) {
+      const X = x + off;
+      ctx.lineTo(x, base - amp * (0.6 * Math.sin(X / 140 + seed) + 0.4 * Math.sin(X / 63 + seed * 2.3) + 0.8));
+    }
+    ctx.lineTo(W, H); ctx.closePath(); ctx.fill();
+  }
+  function buildings(seed, base, color, broken = 0, scale = 1) {
+    const r = rng(seed * 997 + 11);
+    let x = -10;
+    ctx.fillStyle = color;
+    while (x < W + 10) {
+      const w = (30 + r() * 50) * scale, h = (40 + r() * 110) * scale;
+      if (broken) {
+        ctx.beginPath(); ctx.moveTo(x, base);
+        const hh = h * (0.25 + r() * 0.45);
+        ctx.lineTo(x, base - hh);
+        for (let k = 1; k <= 4; k++) ctx.lineTo(x + (w * k) / 4, base - hh * (0.4 + r() * 0.7));
+        ctx.lineTo(x + w, base); ctx.closePath(); ctx.fill();
+      } else {
+        ctx.fillRect(x, base - h, w, h);
+        if (r() > 0.5) { ctx.beginPath(); ctx.moveTo(x - 4, base - h); ctx.lineTo(x + w / 2, base - h - 16 * scale); ctx.lineTo(x + w + 4, base - h); ctx.fill(); }
+      }
+      x += w + r() * 14 * scale;
+    }
+  }
+  function plane(x, y, s = 1) {
+    ctx.save(); ctx.translate(x, y); ctx.scale(s, s); ctx.strokeStyle = INK; ctx.lineWidth = 3;
+    line(-22, 0, 22, 0); line(-4, -18, 4, 18); line(-22, -6, -18, 6); ctx.restore();
+  }
+  function chute(x, y) {
+    ctx.save(); ctx.strokeStyle = INK; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(x, y, 11, Math.PI, 0); ctx.closePath(); ctx.fillStyle = '#f3ead8'; ctx.fill(); ctx.stroke();
+    line(x - 11, y, x, y + 16); line(x + 11, y, x, y + 16); rect(x - 2, y + 16, 4, 4, INK); ctx.restore();
+  }
+  function mushroom(x, base, k, color = '#d9c7b0') {
+    k = ease(k);
+    const h = 300 * k, cw = 60 + 110 * k;
+    ctx.save(); ctx.fillStyle = color; ctx.globalAlpha = 0.92;
+    ctx.beginPath(); ctx.moveTo(x - 18 - 14 * k, base); ctx.lineTo(x - 12, base - h); ctx.lineTo(x + 12, base - h); ctx.lineTo(x + 18 + 14 * k, base); ctx.fill();
+    const top = base - h;
+    for (let i = 0; i < 7; i++) {
+      const a = (i / 6) * Math.PI;
+      circle(x - Math.cos(a) * cw * 0.7, top - Math.sin(a) * 40 * k - 10, 26 + 36 * k, color);
+    }
+    circle(x, top - 30 * k, 40 + 50 * k, color);
+    ctx.restore();
+  }
+  function train(x, y, cars = 4) {
+    ctx.save(); ctx.strokeStyle = INK; ctx.lineWidth = 2.5;
+    for (let i = 0; i < cars; i++) {
+      const cx = x - i * 92;
+      rect(cx - 86, y - 48, 86, 40, i === 0 ? '#5a4a3c' : '#7a6a58'); ctx.strokeRect(cx - 86, y - 48, 86, 40);
+      for (let w = 0; w < 3; w++) rect(cx - 78 + w * 26, y - 42, 16, 13, '#e8dcc2');
+      circle(cx - 68, y - 6, 6, INK); circle(cx - 18, y - 6, 6, INK);
+    }
+    ctx.restore();
+  }
+  function flash(a, color = '#ffffff') { ctx.save(); ctx.globalAlpha = clamp(a); ctx.fillStyle = color; ctx.fillRect(0, 0, W, H); ctx.restore(); }
+  function crane(x, y, s, flap, color) {
+    ctx.save(); ctx.translate(x, y); ctx.scale(s, s); ctx.fillStyle = color; ctx.strokeStyle = 'rgba(0,0,0,.25)'; ctx.lineWidth = 1;
+    const wy = -18 * flap;
+    ctx.beginPath(); ctx.moveTo(-30, 0); ctx.lineTo(0, 4); ctx.lineTo(30, -10); ctx.lineTo(4, -2); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-8, 0); ctx.lineTo(4, 0); ctx.lineTo(-6, wy - 6); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-4, 1); ctx.lineTo(8, 1); ctx.lineTo(14, -wy * 0.4 - 10); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-30, 0); ctx.lineTo(-36, -12); ctx.lineTo(-26, -1); ctx.fill();
+    ctx.restore();
+  }
+  function wallClock(x, y, r, minutes) { // minutes after 10:00
+    circle(x, y, r, '#f8f2e4', INK);
+    ctx.save(); ctx.strokeStyle = INK; ctx.lineWidth = 3;
+    const hA = ((10 + minutes / 60) / 12) * Math.PI * 2, mA = (minutes / 60) * Math.PI * 2;
+    line(x, y, x + Math.sin(hA) * r * 0.5, y - Math.cos(hA) * r * 0.5);
+    ctx.lineWidth = 2; line(x, y, x + Math.sin(mA) * r * 0.8, y - Math.cos(mA) * r * 0.8);
+    ctx.restore();
+  }
+
+  // ---------- stick figure ----------
+  // (x, y) = point between the feet on the ground.
+  function fig(x, y, o = {}) {
+    const s = o.s || 1, c = o.c || INK;
+    const L = 34 * s, B = 38 * s, A = 28 * s, R = 10 * s;
+    ctx.save(); ctx.translate(x, y + (o.bob || 0)); ctx.scale(o.dir || 1, 1); ctx.rotate(o.rot || 0);
+    ctx.strokeStyle = c; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.lineWidth = 3.2 * s;
+    const lean = o.lean || 0;
+    let hip;
+    if (o.sit) {
+      hip = [0, -3 * s];
+      line(hip[0], hip[1], L * 0.95, 0); line(hip[0], hip[1], L * 0.85, -3 * s);
+    } else {
+      hip = [0, -L];
+      const lA = o.lA || 0, rA = o.rA || 0;
+      line(hip[0], hip[1], Math.sin(lA) * L, hip[1] + Math.cos(lA) * L);
+      line(hip[0], hip[1], Math.sin(rA) * L, hip[1] + Math.cos(rA) * L);
+    }
+    const neck = [hip[0] + Math.sin(lean) * B, hip[1] - Math.cos(lean) * B];
+    line(hip[0], hip[1], neck[0], neck[1]);
+    if (o.skirt) {
+      ctx.fillStyle = o.skirtC || '#8a5a4a';
+      const m = [lerp(hip[0], neck[0], 0.35), lerp(hip[1], neck[1], 0.35)];
+      ctx.beginPath(); ctx.moveTo(m[0] - 3 * s, m[1]); ctx.lineTo(m[0] + 3 * s, m[1]); ctx.lineTo(hip[0] + 13 * s, hip[1] + 20 * s); ctx.lineTo(hip[0] - 13 * s, hip[1] + 20 * s); ctx.closePath(); ctx.fill();
+    }
+    const sh = [lerp(neck[0], hip[0], 0.12), lerp(neck[1], hip[1], 0.12)];
+    const aL = o.aL ?? 0.15, aR = o.aR ?? -0.15;
+    const hL = [sh[0] + Math.sin(aL + lean) * A, sh[1] + Math.cos(aL + lean) * A];
+    const hR = [sh[0] + Math.sin(aR + lean) * A, sh[1] + Math.cos(aR + lean) * A];
+    ctx.strokeStyle = o.burn ? '#b5562f' : c; line(sh[0], sh[1], hL[0], hL[1]); // "left" arm (far side)
+    ctx.strokeStyle = c; line(sh[0], sh[1], hR[0], hR[1]);
+    const hd = [neck[0] + Math.sin(lean) * (R + 2 * s) + (o.headDx || 0) * s, neck[1] - Math.cos(lean) * (R + 2 * s)];
+    circle(hd[0], hd[1], R, o.headFill || PAPER, c);
+    if (o.hair) { ctx.fillStyle = c; ctx.beginPath(); ctx.arc(hd[0], hd[1], R, Math.PI * 1.05, Math.PI * 1.95); ctx.fill(); }
+    if (o.bandage) {
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 4 * s;
+      ctx.beginPath(); ctx.arc(hd[0], hd[1], R - 1, Math.PI * 0.95, Math.PI * 2.05); ctx.stroke();
+      ctx.lineWidth = 5 * s; line(lerp(sh[0], hL[0], 0.25), lerp(sh[1], hL[1], 0.25), lerp(sh[0], hL[0], 0.8), lerp(sh[1], hL[1], 0.8));
+      ctx.strokeStyle = c; ctx.lineWidth = 1; circle(hd[0], hd[1], R, null, c);
+    }
+    if (o.baby) { ctx.save(); ctx.fillStyle = '#f8f2e4'; ctx.strokeStyle = c; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(hR[0] + 2 * s, hR[1] - 3 * s, 9 * s, 6 * s, -0.4, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); circle(hR[0] + 8 * s, hR[1] - 7 * s, 4 * s, '#f8f2e4', c); ctx.restore(); }
+    if (o.cane) { ctx.lineWidth = 2.5 * s; line(hR[0], hR[1], hR[0] + 4 * s, 0); }
+    if (o.ring) {
+      ctx.strokeStyle = 'rgba(255,230,200,.8)'; ctx.lineWidth = 2;
+      for (let i = 0; i < 3; i++) { const rr = R + 6 + ((o.ring * 30 + i * 8) % 24); ctx.beginPath(); ctx.arc(hd[0], hd[1], rr, -0.6, 0.6); ctx.stroke(); ctx.beginPath(); ctx.arc(hd[0], hd[1], rr, Math.PI - 0.6, Math.PI + 0.6); ctx.stroke(); }
+    }
+    ctx.restore();
+    return { head: [x + (o.dir || 1) * hd[0], y + hd[1]] };
+  }
+  function walk(ph, amp = 1) {
+    const sn = Math.sin(ph);
+    return { lA: sn * 0.45 * amp, rA: -sn * 0.45 * amp, aL: -sn * 0.4 * amp, aR: sn * 0.4 * amp, bob: -Math.abs(Math.cos(ph)) * 2 * amp };
+  }
+  function bubble(x, y, str, alpha = 1) {
+    ctx.save(); ctx.globalAlpha = clamp(alpha);
+    ctx.fillStyle = '#fffaf0'; ctx.strokeStyle = INK; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.ellipse(x, y, 26, 20, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x - 6, y + 18); ctx.lineTo(x - 14, y + 32); ctx.lineTo(x + 2, y + 19); ctx.fill();
+    text(str, x, y + 1, 22, INK, 'center', 1, 'serif', 'bold'); ctx.restore();
+  }
+
+  // ---------- reusable backdrops ----------
+  function hiroshimaMorning() {
+    sky('#a9cbe0', '#efe6cf'); hills(300, 30, '#b8c3b0', 2); buildings(7, 400, '#8d8576'); ground(400, '#cfc2a4');
+  }
+  function office(t, minutes) {
+    rect(0, 0, W, 440, '#d9ccb2'); rect(0, 440, W, 100, '#a68f6e'); ctx.strokeStyle = INK; ctx.lineWidth = 2; line(0, 440, W, 440);
+    // window
+    ctx.save(); ctx.beginPath(); ctx.rect(600, 110, 270, 210); ctx.clip();
+    sky('#a9cbe0', '#e9e2cc'); hills(330, 60, '#93a58a', 4); buildings(3, 320, '#8a8273', 0, 0.6); ctx.restore();
+    ctx.strokeStyle = INK; ctx.lineWidth = 6; ctx.strokeRect(600, 110, 270, 210); ctx.lineWidth = 3; line(735, 110, 735, 320); line(600, 215, 870, 215);
+    // desk
+    rect(380, 380, 200, 12, '#6b5440'); rect(390, 392, 10, 48, '#6b5440'); rect(560, 392, 10, 48, '#6b5440');
+    rect(410, 368, 60, 12, '#f3ead8'); // papers
+    wallClock(180, 140, 34, minutes);
+  }
+
+  // ---------- scenes ----------
+  const scenes = [
+    { dur: 8, cap: "Twice. The story of Tsutomu Yamaguchi, a dramatised retelling of a true story.",
+      draw(t, p) {
+        sky('#efe6d2', '#e2d5bb');
+        text('TWICE', W / 2, 190, 110, INK, 'center', ease(t / 1.5), 'Georgia, serif', 'bold');
+        text('The story of Tsutomu Yamaguchi', W / 2, 270, 30, INK, 'center', ease((t - 1.2) / 1.5));
+        text('A dramatised retelling of a true story', W / 2, 315, 20, '#6d655c', 'center', ease((t - 2.4) / 1.5), 'Georgia, serif', 'italic');
+        ctx.strokeStyle = INK; ctx.lineWidth = 2; line(330, 470, 630, 470);
+        ctx.save(); ctx.globalAlpha = ease((t - 3) / 1.5); fig(480, 470, { s: 1.2, hair: 1 }); ctx.restore();
+      } },
+    { dur: 10, cap: "Nagasaki, 1945. Tsutomu Yamaguchi, 29, is an engineer at Mitsubishi’s shipyard, designing oil tankers. At home are his wife Hisako and their baby son, Katsutoshi.",
+      draw(t, p) {
+        sky('#b8d3e3', '#efe6cf'); hills(300, 70, '#9fb194', 1); rect(0, 360, W, 60, '#9db7c0');
+        // ship hull
+        ctx.fillStyle = '#5a5048'; ctx.beginPath(); ctx.moveTo(40, 350); ctx.lineTo(340, 350); ctx.lineTo(310, 385); ctx.lineTo(70, 385); ctx.fill(); rect(260, 322, 40, 28, '#6d6258');
+        ground(420, '#cfc2a4');
+        // drafting table
+        ctx.strokeStyle = INK; ctx.lineWidth = 3; line(230, 380, 330, 356); line(250, 376, 250, 420); line(312, 360, 312, 420);
+        ctx.fillStyle = '#fffaf0'; ctx.beginPath(); ctx.moveTo(240, 376); ctx.lineTo(322, 357); ctx.lineTo(320, 352); ctx.lineTo(238, 371); ctx.fill();
+        fig(190, 420, { hair: 1, aR: 1.25 + Math.sin(t * 5) * 0.15, aL: 0.9, lean: 0.12 });
+        // home
+        ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.strokeRect(620, 320, 170, 100);
+        ctx.fillStyle = '#6b4a3a'; ctx.beginPath(); ctx.moveTo(600, 322); ctx.lineTo(705, 262); ctx.lineTo(810, 322); ctx.fill(); rect(690, 360, 30, 60, '#8a6b52');
+        ctx.save(); ctx.globalAlpha = ease((t - 3) / 1.5);
+        fig(570, 420, { skirt: 1, baby: 1, aR: 0.9 + Math.sin(t * 2) * 0.08, aL: 0.4, dir: -1, hair: 1 });
+        ctx.restore();
+        tag('Nagasaki, 1945', ease(t));
+      } },
+    { dur: 9, cap: "That summer, the company sends him to Hiroshima on a three-month work assignment.",
+      draw(t, p) {
+        const off = t * 90;
+        sky('#b6d2e4', '#f1e7cd'); hills(290, 60, '#a7b79b', 3, off * 0.3); hills(360, 40, '#8fa284', 5, off * 0.7);
+        ground(420, '#cbbd9d');
+        ctx.strokeStyle = INK; ctx.lineWidth = 2;
+        for (let x = -((off) % 160); x < W; x += 160) { line(x, 420, x, 330); line(x - 12, 340, x + 12, 340); }
+        rect(0, 418, W, 4, '#5a5048');
+        train(lerp(-60, W + 380, p), 418, 4);
+        tag('Nagasaki → Hiroshima', ease(t));
+      } },
+    { dur: 11, cap: "August 6, his last day. Walking to the station with two colleagues, he realises he has forgotten his hanko, his personal seal, and turns back to the shipyard.",
+      draw(t) {
+        hiroshimaMorning();
+        const v = 70, stop = 3.5, wait = 1.6;
+        fig(110 + t * v, 400, { ...walk(t * 6), hair: 1 });
+        fig(30 + t * v, 400, { ...walk(t * 6 + 1.3), hair: 1 });
+        let x, o;
+        if (t < stop) { x = 190 + t * v; o = { ...walk(t * 6), dir: 1 }; }
+        else if (t < stop + wait) { x = 190 + stop * v; o = { dir: 1, aR: Math.PI - 0.5, aL: 0.2 }; }
+        else { const k = t - stop - wait; x = 190 + stop * v - k * v; o = { ...walk(k * 6), dir: -1 }; }
+        const f = fig(x, 400, { ...o, hair: 1 });
+        if (t > stop && t < stop + wait + 1.5) bubble(f.head[0] + 34, f.head[1] - 42, '印', seg(t, stop, stop + 0.3) * (1 - seg(t, stop + wait + 0.8, stop + wait + 1.5)));
+        tag('Hiroshima · 6 August 1945, morning', ease(t));
+      } },
+    { dur: 9, cap: "About 8:15 a.m. Near the shipyard, roughly three kilometres from the city centre, he hears a plane and looks up. Two small parachutes drift down.",
+      draw(t, p) {
+        sky('#9cc3dc', '#efe6cf'); hills(330, 25, '#b8c3b0', 2); buildings(9, 430, '#8d8576', 0, 0.7); ground(430, '#cfc2a4');
+        const look = seg(t, 2.5, 3.2);
+        const o = look > 0 ? { lean: -0.12 * look, aR: lerp(-0.15, 2.7, look), aL: 0.15 } : walk(t * 5, 0.8);
+        fig(lerp(420, 520, seg(t, 0, 2.5)), 430, { ...o, hair: 1, headDx: -2 * look });
+        const pk = seg(t, 1, 6.5); plane(lerp(-60, W + 60, pk), 85, 0.9);
+        if (t > 4) { const k = t - 4; chute(560 + k * 6, 100 + k * 18); chute(600 + k * 5, 110 + k * 16); }
+        text('8:15', W - 70, 40, 30, INK, 'center', ease(t), 'Georgia, serif', 'bold');
+      } },
+    { dur: 7, cap: "A blinding flash, brighter than the sun. The blast throws him to the ground.",
+      draw(t) {
+        const after = seg(t, 2.6, 4.8);
+        if (t < 2.6) {
+          sky('#9cc3dc', '#efe6cf'); hills(330, 25, '#b8c3b0', 2); buildings(9, 430, '#8d8576', 0, 0.7); ground(430, '#cfc2a4');
+          const fall = ease(seg(t, 0.9, 1.7));
+          fig(520 + fall * 40, 430, { lean: -0.12, aR: 2.7, hair: 1, rot: -1.45 * fall });
+        } else {
+          sky('#6d5546', '#c2895a'); buildings(9, 430, '#4a3a32', 1, 0.7); ground(430, '#8a7660');
+          fig(560, 430, { hair: 1, rot: -1.45, aR: 2.4 });
+        }
+        const fl = t < 0.6 ? 0 : t < 1.0 ? seg(t, 0.6, 1.0) : 1 - after;
+        flash(fl, '#fffdf6');
+      } },
+    { dur: 11, cap: "When he comes to, the sky is dark. His eardrums are ruptured and the left side of his upper body is badly burned. A huge cloud rises over the city.",
+      draw(t) {
+        sky('#3f332e', '#a8683f'); mushroom(700, 420, seg(t, 0, 9), '#cdb8a0'); buildings(9, 430, '#2f2622', 1, 0.8); ground(430, '#6e5d4c');
+        // dust
+        ctx.save(); ctx.globalAlpha = 0.18; for (let i = 0; i < 30; i++) { const r = rng(i + 3); circle((r() * W + t * 8 * (r() + .3)) % W, 300 + r() * 200, 2 + r() * 3, '#e8d5bb'); } ctx.restore();
+        const up = ease(seg(t, 2.5, 5.5));
+        fig(300, 430, { hair: 1, rot: lerp(-1.45, 0, up), lean: 0.1 * up, aL: 0.25, aR: lerp(2.4, -0.3, up), burn: 1, ring: t * 0.6, c: '#211b17', headFill: '#e8d9c0' });
+      } },
+    { dur: 10, cap: "He spends the night in an air-raid shelter. In the morning he finds his two colleagues alive.",
+      draw(t, p) {
+        const m = seg(t, 5, 8);
+        sky(mix('#121826', '#7d6a5c', m), mix('#25304a', '#c49a72', m));
+        hills(260, 60, mix('#1d1a18', '#4a3d33', m), 6);
+        ctx.fillStyle = '#0c0a09'; ctx.beginPath(); ctx.ellipse(420, 430, 150, 120, 0, Math.PI, 0); ctx.fill();
+        ground(430, mix('#2b2420', '#6e5d4c', m));
+        const g = ctx.createRadialGradient(420, 410, 5, 420, 410, 120); g.addColorStop(0, 'rgba(255,190,110,.55)'); g.addColorStop(1, 'rgba(255,190,110,0)');
+        ctx.fillStyle = g; ctx.fillRect(280, 300, 280, 130); circle(470, 418, 6, '#ffcf7a');
+        fig(400, 430, { sit: 1, hair: 1, lean: -0.05, aL: 0.6, aR: 0.9, burn: 1, c: '#e9dcc8', headFill: '#3a302a' });
+        if (t > 5.5) {
+          const k = ease(seg(t, 5.5, 8.5));
+          fig(lerp(W + 40, 640, k), 430, { ...walk(t * 5, 1 - k), hair: 1, dir: -1, c: '#1d1714' });
+          fig(lerp(W + 110, 710, k), 430, { ...walk(t * 5 + 1, 1 - k), hair: 1, dir: -1, c: '#1d1714' });
+        }
+        tag(t < 5 ? 'Night, 6 August' : 'Morning, 7 August', 1);
+      } },
+    { dur: 11, cap: "August 7. Through the ruined city and across a river, they reach a train that is still running, and head home to Nagasaki.",
+      draw(t, p) {
+        sky('#6f645d', '#b9a088'); buildings(13, 380, '#4c423b', 1, 0.8);
+        if (t > 6) train(lerp(-40, W + 400, seg(t, 6, 11)), 372, 5);
+        ground(380, '#7b6b58');
+        rect(0, 420, W, 70, '#5d6c72'); ctx.strokeStyle = '#8fa1a7'; ctx.lineWidth = 1.5;
+        for (let i = 0; i < 8; i++) { const x = (i * 140 + t * 25) % (W + 100) - 50; line(x, 440 + (i % 3) * 14, x + 40, 440 + (i % 3) * 14); }
+        rect(0, 490, W, 50, '#7b6b58');
+        // bridge
+        rect(150, 412, 660, 10, '#3d342d'); for (let x = 190; x < 800; x += 120) rect(x, 422, 10, 68, '#3d342d');
+        const k = seg(t, 0, 6.5);
+        [0, 50, 100].forEach((d, i) => fig(lerp(120 - d, 860 - d, k), 412, { ...(k < 1 ? walk(t * 5 + i) : {}), hair: 1, burn: i === 0, c: '#231d19', headFill: '#e8d9c0', lean: 0.08 }));
+        tag('7 August', ease(t));
+      } },
+    { dur: 10, cap: "August 8. In Nagasaki, a doctor treats his burns. Wrapped in bandages, he is home with Hisako and their son.",
+      draw(t) {
+        sky('#b8d3e3', '#efe6cf'); hills(310, 70, '#9fb194', 1); ground(420, '#cfc2a4');
+        ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.strokeRect(560, 320, 200, 100);
+        ctx.fillStyle = '#6b4a3a'; ctx.beginPath(); ctx.moveTo(540, 322); ctx.lineTo(660, 258); ctx.lineTo(780, 322); ctx.fill(); rect(645, 360, 30, 60, '#8a6b52');
+        const k = ease(seg(t, 0, 3));
+        fig(lerp(150, 380, k), 420, { ...(k < 1 ? walk(t * 4, 0.7) : { aL: 0.2, aR: 0.6 }), hair: 1, bandage: 1 });
+        fig(470, 420, { skirt: 1, baby: 1, aR: 0.9 + Math.sin(t * 2) * 0.08, aL: -0.6 * ease(seg(t, 3, 4)), dir: -1, hair: 1 });
+        tag('Nagasaki · 8 August', ease(t));
+      } },
+    { dur: 12, cap: "August 9. Despite his injuries, he reports to the Mitsubishi office and describes what happened in Hiroshima. His supervisor can’t believe one bomb could destroy a whole city.",
+      draw(t, p) {
+        office(t, lerp(48, 61.5, p));
+        const g = Math.sin(t * 3);
+        fig(320, 440, { hair: 1, bandage: 1, aR: 1.6 + g * 0.5, aL: 0.3, lean: 0.05 });
+        const doubt = seg(t, 6, 7);
+        fig(520, 440, { hair: 1, dir: -1, aR: lerp(0.2, 1.1, doubt), aL: lerp(-0.15, 1.2, doubt), headDx: doubt > 0 && t < 10 ? Math.sin(t * 9) * 3 : 0 });
+        if (t > 6.5 && t < 10.5) bubble(560, 300, '?', seg(t, 6.5, 7) * (1 - seg(t, 10, 10.5)));
+        tag('Nagasaki · 9 August', ease(t));
+      } },
+    { dur: 8, cap: "11:02 a.m. Mid-conversation, the same white flash fills the room. Once again, he is about three kilometres from where the bomb explodes.",
+      draw(t) {
+        if (t < 2.2) {
+          office(t, 62);
+          fig(320, 440, { hair: 1, bandage: 1, aR: 1.4, aL: 0.3 });
+          fig(520, 440, { hair: 1, dir: -1, aR: 1.1, aL: 1.2 });
+          const w = seg(t, 0.7, 1.4);
+          ctx.save(); ctx.globalAlpha = w; rect(600, 110, 270, 210, '#ffffff'); ctx.restore();
+        } else {
+          rect(0, 0, W, H, '#8f8273');
+          ctx.save(); ctx.translate(480, 270); ctx.rotate(0.03); ctx.translate(-480, -270);
+          rect(0, 440, W, 100, '#6f604f'); ctx.strokeStyle = '#3a312a'; ctx.lineWidth = 5; ctx.strokeRect(600, 110, 270, 210);
+          ctx.lineWidth = 3; line(620, 130, 700, 260); line(800, 120, 760, 300);
+          ctx.restore();
+          ctx.save(); ctx.fillStyle = '#4e4339'; const r = rng(5); for (let i = 0; i < 22; i++) { ctx.fillRect(r() * W, 400 + r() * 120, 10 + r() * 50, 6 + r() * 8); } ctx.restore();
+          fig(300, 446, { hair: 1, rot: -1.45, aR: 2.4, c: '#241e19', headFill: '#e0d2b8' });
+          fig(560, 446, { hair: 1, rot: 1.45, dir: -1, aR: 2.4, c: '#241e19', headFill: '#e0d2b8' });
+        }
+        const fl = t < 1.4 ? 0 : t < 1.8 ? seg(t, 1.4, 1.8) : 1 - seg(t, 2.8, 5);
+        flash(fl, '#fffdf6');
+        text('11:02', W - 70, 40, 30, INK, 'center', 1 - seg(t, 1.4, 1.6), 'Georgia, serif', 'bold');
+      } },
+    { dur: 12, cap: "He survives again. He rushes home. Hisako and the baby are alive: she had gone out to find ointment for his burns, and they sheltered in a tunnel.",
+      draw(t) {
+        sky('#8a7a6c', '#cfb08d'); hills(280, 80, '#7d7462', 8); mushroom(240, 330, 0.75, 'rgba(210,195,175,0.6)');
+        buildings(21, 420, '#4f453c', 1, 0.6);
+        ctx.fillStyle = '#5d5345'; ctx.beginPath(); ctx.moveTo(640, 420); ctx.quadraticCurveTo(820, 210, W + 20, 260); ctx.lineTo(W, 420); ctx.fill();
+        ctx.fillStyle = '#100d0b'; ctx.beginPath(); ctx.ellipse(850, 420, 46, 60, 0, Math.PI, 0); ctx.fill();
+        ground(420, '#8a7a62');
+        const run = ease(seg(t, 0, 5));
+        const meet = seg(t, 6, 8);
+        const x = lerp(80, 660, run);
+        const o = run < 1 ? walk(t * 9, 1.3) : { aR: lerp(-0.1, 2.6, meet), aL: lerp(0.2, -2.4, meet) };
+        fig(x, 420, { ...o, hair: 1, lean: run < 1 ? 0.2 : 0 });
+        if (t > 5) {
+          const e = ease(seg(t, 5, 7.5));
+          ctx.save(); ctx.globalAlpha = seg(t, 5, 5.6);
+          fig(lerp(850, 740, e), 420, { ...(e < 1 ? walk(t * 5, 0.6) : {}), skirt: 1, baby: 1, aR: 0.9, aL: 0.3, dir: -1, hair: 1 });
+          ctx.restore();
+        }
+        tag('Nagasaki · 9 August', ease(t));
+      } },
+    { dur: 12, cap: "Six days later, Japan surrenders. He goes on to work as a translator for the occupation forces, a teacher, and later back at Mitsubishi. For decades he rarely speaks about what he saw.",
+      draw(t, p) {
+        sky('#efe6d2', '#e2d5bb'); hills(330, 40, '#c9bfa8', 3); ground(430, '#cfc2a4');
+        const r = rng(4);
+        for (let i = 0; i < 7; i++) {
+          const k = ease(seg(t, 1 + i * 0.9, 2 + i * 0.9)); const bx = 460 + i * 70, bw = 50 + r() * 15, bh = (50 + r() * 60) * k;
+          rect(bx, 430 - bh, bw, bh, '#a79a84'); if (k > 0.9) { ctx.fillStyle = '#6b4a3a'; ctx.beginPath(); ctx.moveTo(bx - 4, 430 - bh); ctx.lineTo(bx + bw / 2, 430 - bh - 18); ctx.lineTo(bx + bw + 4, 430 - bh); ctx.fill(); }
+        }
+        // blackboard
+        rect(90, 250, 220, 120, '#2f4a3c'); ctx.strokeStyle = '#6b5440'; ctx.lineWidth = 6; ctx.strokeRect(90, 250, 220, 120);
+        ctx.save(); ctx.beginPath(); ctx.rect(100, 260, 200 * seg(t, 2, 10), 100); ctx.clip(); text('A B C', 200, 290, 28, '#e8efe4'); text('あいう', 200, 330, 26, '#e8efe4'); ctx.restore();
+        fig(350, 430, { hair: 1, dir: -1, aR: 1.9 + Math.sin(t * 4) * 0.15, aL: 0.2 });
+        const yr = 1945 + Math.floor(ease(seg(t, 1.5, 11)) * 30);
+        rect(W / 2 - 70, 60, 140, 90, '#fffaf0'); ctx.strokeStyle = INK; ctx.lineWidth = 2; ctx.strokeRect(W / 2 - 70, 60, 140, 90); rect(W / 2 - 70, 60, 140, 22, '#a8432a');
+        text(String(yr), W / 2, 116, 40, INK, 'center', 1, 'Georgia, serif', 'bold');
+        text('15 August 1945: the war ends', W / 2, 180, 22, INK, 'center', 1 - seg(t, 2.5, 3.5), 'Georgia, serif', 'italic');
+      } },
+    { dur: 12, cap: "In old age he becomes a voice against nuclear weapons, speaking at the United Nations in 2006. In 2009, Japan officially recognises him as a survivor of both bombings.",
+      draw(t) {
+        sky('#2b3140', '#41485a'); rect(0, 400, W, 140, '#2a2420');
+        const g = ctx.createRadialGradient(480, 250, 10, 480, 250, 300); g.addColorStop(0, 'rgba(255,236,200,.35)'); g.addColorStop(1, 'rgba(255,236,200,0)'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+        rect(520, 330, 70, 70, '#6b5440'); ctx.strokeStyle = '#d9c7a6'; ctx.lineWidth = 2; line(540, 330, 530, 300);
+        fig(470, 400, { hair: 0, lean: 0.14, aR: 1.0 + Math.sin(t * 2.5) * 0.25, aL: 0.25, c: '#f0e6d4', headFill: '#5a4c40', s: 1.05 });
+        for (let i = 0; i < 14; i++) { const x = 40 + i * 68 + (i % 2) * 20; ctx.fillStyle = '#16120f'; ctx.beginPath(); ctx.arc(x, 520 + (i % 2) * 6, 22, Math.PI, 0); ctx.fill(); rect(x - 26, 520 + (i % 2) * 6, 52, 40, '#16120f'); }
+        text('2006 · United Nations, New York', W / 2, 70, 28, '#f3ead8', 'center', ease(seg(t, 0.5, 1.5)) * (1 - seg(t, 5.5, 6.3)));
+        text('2009 · officially recognised as a', W / 2, 60, 26, '#f3ead8', 'center', ease(seg(t, 6.3, 7.3)));
+        text('nijū hibakusha (二重被爆者) · double survivor', W / 2, 100, 26, '#f6c28b', 'center', ease(seg(t, 6.8, 7.8)), 'Georgia, serif', 'bold');
+      } },
+    { dur: 14, cap: "Tsutomu Yamaguchi died in 2010, aged 93. He is the only person the Japanese government has officially recognised as surviving both atomic bombings.",
+      draw(t, p) {
+        sky('#e9a46d', '#f6dcb6'); circle(480, 380, 70, '#f8e5c2'); rect(0, 380, W, 160, '#7f8f98');
+        ctx.save(); ctx.globalAlpha = 0.35; ctx.strokeStyle = '#f8e5c2'; ctx.lineWidth = 2; for (let i = 0; i < 6; i++) line(420 + i * 4, 395 + i * 18, 540 - i * 4, 395 + i * 18); ctx.restore();
+        const cols = ['#c94f3d', '#f3ead8', '#e6b84a', '#5b8fb3', '#8fbf7f', '#e98aa0'];
+        for (let i = 0; i < 12; i++) {
+          const r = rng(i * 7 + 2), x0 = r() * W, sp = 18 + r() * 22, d = r() * 3;
+          const y = 560 - ((t + d) * sp) % 640; const x = x0 + Math.sin((t + d) * 0.8) * 30;
+          crane(x, y, 0.8 + r() * 0.6, Math.sin((t + d) * 4), cols[i % cols.length]);
+        }
+        text('Tsutomu Yamaguchi', W / 2, 150, 54, INK, 'center', ease(seg(t, 1, 3)), 'Georgia, serif', 'bold');
+        text('1916 – 2010', W / 2, 210, 28, INK, 'center', ease(seg(t, 2, 4)));
+        text('Survived Hiroshima and Nagasaki.', W / 2, 265, 22, INK, 'center', ease(seg(t, 4, 6)), 'Georgia, serif', 'italic');
+        text('He spent his last years asking that it never happen again.', W / 2, 300, 20, INK, 'center', ease(seg(t, 6, 8)), 'Georgia, serif', 'italic');
+      } },
+  ];
+
+  // ---------- player ----------
+  const capEl = document.getElementById('cap'), numEl = document.getElementById('num');
+  const playBtn = document.getElementById('play'), voiceEl = document.getElementById('voice');
+  const bar = document.getElementById('bar'), startEl = document.getElementById('start');
+  const fills = scenes.map((_, i) => {
+    const s = document.createElement('span'); s.title = 'Scene ' + (i + 1); const f = document.createElement('i'); s.appendChild(f);
+    s.addEventListener('click', () => { go(i); if (!playing) setPlaying(true); });
+    bar.appendChild(s); return f;
+  });
+
+  let idx = 0, elapsed = 0, playing = false, last = 0, speaking = false;
+  const synth = 'speechSynthesis' in window ? window.speechSynthesis : null;
+  if (!synth) { voiceEl.disabled = true; voiceEl.parentElement.title = 'Speech is not supported in this browser'; }
+  try { voiceEl.checked = localStorage.getItem('twice-voice') === '1' && !!synth; } catch (e) {}
+
+  function pickVoice() {
+    if (!synth) return null;
+    const vs = synth.getVoices().filter(v => /^en/i.test(v.lang));
+    return vs.find(v => /Daniel|Google UK English Male|Serena|Samantha/i.test(v.name)) || vs[0] || null;
+  }
+  function speak() {
+    if (!synth) return;
+    synth.cancel(); speaking = false;
+    if (!voiceEl.checked || !playing) return;
+    const u = new SpeechSynthesisUtterance(scenes[idx].cap);
+    const v = pickVoice(); if (v) u.voice = v;
+    u.lang = 'en-GB'; u.rate = 0.92; u.pitch = 0.95;
+    u.onend = u.onerror = () => { if (cur === u) speaking = false; };
+    cur = u; speaking = true; synth.speak(u);
+  }
+  let cur = null;
+
+  function show() {
+    capEl.textContent = scenes[idx].cap;
+    numEl.textContent = `Scene ${idx + 1} of ${scenes.length}`;
+    fills.forEach((f, i) => f.style.width = i < idx ? '100%' : '0');
+  }
+  function go(i) {
+    idx = clamp(i, 0, scenes.length - 1); elapsed = 0; show(); speak(); render();
+  }
+  function setPlaying(v) {
+    playing = v; playBtn.textContent = v ? '⏸' : '▶'; startEl.hidden = true;
+    if (!synth) return;
+    if (v) { if (synth.paused) synth.resume(); else if (!speaking) speak(); }
+    else if (synth.speaking) synth.pause();
+  }
+  function render() {
+    const s = scenes[idx], t = Math.min(elapsed, s.dur);
+    ctx.save(); s.draw(t, t / s.dur); ctx.restore();
+    fills[idx].style.width = (100 * t / s.dur) + '%';
+  }
+  function frame(now) {
+    const dt = Math.min(0.1, (now - last) / 1000 || 0); last = now;
+    if (playing) {
+      elapsed += dt;
+      const s = scenes[idx];
+      if (elapsed >= s.dur && !(voiceEl.checked && speaking)) {
+        if (idx < scenes.length - 1) go(idx + 1);
+        else { elapsed = s.dur; setPlaying(false); }
+      }
+    }
+    render();
+    requestAnimationFrame(frame);
+  }
+
+  document.getElementById('startBtn').onclick = () => { go(0); setPlaying(true); };
+  playBtn.onclick = () => setPlaying(!playing);
+  document.getElementById('prev').onclick = () => go(idx - 1);
+  document.getElementById('next').onclick = () => go(idx + 1);
+  document.getElementById('restart').onclick = () => { go(0); setPlaying(true); };
+  voiceEl.onchange = () => {
+    try { localStorage.setItem('twice-voice', voiceEl.checked ? '1' : '0'); } catch (e) {}
+    if (voiceEl.checked) speak(); else if (synth) { synth.cancel(); speaking = false; }
+  };
+  document.addEventListener('keydown', e => {
+    if (e.target.tagName === 'INPUT' && e.key !== ' ') return;
+    if (e.key === ' ') { e.preventDefault(); setPlaying(!playing); }
+    else if (e.key === 'ArrowRight') go(idx + 1);
+    else if (e.key === 'ArrowLeft') go(idx - 1);
+  });
+  if (synth) synth.onvoiceschanged = () => {};
+  window.addEventListener('resize', () => { resize(); render(); });
+
+  // test hook: render scene i at time t
+  window.__twice = { count: scenes.length, at(i, t) { startEl.hidden = true; idx = i; elapsed = t; show(); render(); } };
+
+  resize(); show(); render(); requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

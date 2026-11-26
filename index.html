@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Man Who Survived Two Atomic Bombs – Stick-Figure Short</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;background:#16130f;color:#f3ead8;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+  body{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:10px}
+  #wrap{position:relative;height:min(calc(100vh - 150px),calc((100vw - 20px)*16/9));aspect-ratio:9/16;background:#000;border-radius:14px;overflow:hidden;box-shadow:0 8px 30px rgba(0,0,0,.5)}
+  svg#stage{width:100%;height:100%;display:block}
+  #cap{position:absolute;left:0;right:0;bottom:0;padding:14px 14px 18px;background:linear-gradient(transparent,rgba(0,0,0,.82) 40%);font-size:clamp(14px,3.6vw,20px);line-height:1.35;text-align:center;font-weight:600;min-height:92px;display:flex;align-items:flex-end;justify-content:center}
+  #start{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:rgba(15,12,8,.82);text-align:center;padding:24px;cursor:pointer}
+  #start h1{font-size:clamp(18px,5vw,26px);line-height:1.25}
+  #start .play{width:74px;height:74px;border-radius:50%;background:#f3ead8;color:#16130f;display:flex;align-items:center;justify-content:center;font-size:34px;padding-left:6px}
+  #start small{opacity:.7;font-size:13px}
+  #bar{width:min(100%,calc((100vh - 150px)*9/16));display:flex;align-items:center;gap:8px}
+  #prog{flex:1;height:6px;background:#3a342b;border-radius:3px;overflow:hidden}
+  #prog i{display:block;height:100%;width:0;background:#e0b25c}
+  button{background:#2b261e;color:#f3ead8;border:1px solid #4a4236;border-radius:10px;padding:8px 12px;font-size:14px;cursor:pointer}
+  button.on{background:#e0b25c;color:#16130f;border-color:#e0b25c}
+  #count{font-size:13px;opacity:.75;min-width:44px;text-align:center}
+  #note{font-size:11.5px;opacity:.6;text-align:center;max-width:420px;line-height:1.4}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <svg id="stage" viewBox="0 0 360 640" preserveAspectRatio="xMidYMid slice"></svg>
+  <div id="cap"></div>
+  <div id="start"><div class="play">&#9654;</div><h1>The Man Who Survived Two Atomic Bombs</h1><small>Stick-figure short &middot; tap to play</small></div>
+</div>
+<div id="bar">
+  <button id="prev" aria-label="Previous scene">&#9664;&#9664;</button>
+  <button id="pp" aria-label="Play or pause">Pause</button>
+  <button id="next" aria-label="Next scene">&#9654;&#9654;</button>
+  <div id="prog"><i></i></div>
+  <div id="count">1/16</div>
+  <button id="voice" aria-label="Read aloud">Voice</button>
+</div>
+<div id="note">Based on the true story of Tsutomu Yamaguchi (1916&ndash;2010). The boss&rsquo;s exact words and small scene details are dramatised.</div>
+
+<script>
+const FY=540, K='#1a1a1a';
+const clamp=(v,a=0,b=1)=>Math.min(b,Math.max(a,v));
+const lerp=(a,b,t)=>a+(b-a)*t;
+const ease=t=>t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
+const COL={eng:'#3b6fb6',boss:'#33302c',wife:'#4f9a5b',baby:'#f0c53a',off:'#8c8c8c',old:'#3b6fb6',x:'#9a9288'};
+
+function fig(k,x,y,o={}){
+  const s=(o.s??1)*1.3,d=o.d??1,sy=o.sy??1,rot=o.rot??0,w=o.w??0,op=o.op??1;
+  const sw=o.still?0:Math.sin(w)*24;
+  const arm=a=>[Math.sin(a*Math.PI/180)*30,-75+Math.cos(a*Math.PI/180)*30];
+  const h1=o.h1||arm(o.a1??-sw), h2=o.h2||arm(o.a2??sw);
+  const hr=o.hr||0, hrad=k==='baby'?18:14, hy=k==='baby'?-98:-96;
+  let g=`<g stroke="${K}" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none">`;
+  // legs
+  if(o.sit){ g+=`<polyline points="0,-45 28,-45 28,0"/><polyline points="0,-45 22,-42 24,0"/>`; }
+  else { const a=sw*Math.PI/180; g+=`<line x1="0" y1="-45" x2="${Math.sin(a)*45}" y2="${-45+Math.cos(a)*45}"/><line x1="0" y1="-45" x2="${-Math.sin(a)*45}" y2="${-45+Math.cos(a)*45}"/>`; }
+  if(k==='wife') g+=`<polygon points="0,-80 -21,-38 21,-38" fill="${COL.wife}"/>`;
+  // arms
+  g+=`<line x1="0" y1="-75" x2="${h2[0]}" y2="${h2[1]}"/>`;
+  g+=`<line x1="0" y1="-75" x2="${h1[0]}" y2="${h1[1]}"/>`;
+  if(o.band){ const bx=(f)=>[lerp(0,h1[0],f),lerp(-75,h1[1],f)]; const a=bx(.3),b=bx(.85); g+=`<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="#dcdcdc" stroke-width="7"/>`; }
+  if(o.red){ const m=[lerp(0,h1[0],.55),lerp(-75,h1[1],.55)]; g+=`<circle cx="${m[0]}" cy="${m[1]}" r="4.5" fill="#c23b2e" stroke="none"/>`; }
+  if(k==='off'){ const a=[lerp(0,h1[0],.25),lerp(-75,h1[1],.25)],b=[lerp(0,h1[0],.5),lerp(-75,h1[1],.5)]; g+=`<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="#e8892b" stroke-width="7"/>`; }
+  // torso
+  if(k!=='wife'){ g+=`<line x1="0" y1="-45" x2="0" y2="-78" stroke-width="13"/><line x1="0" y1="-45" x2="0" y2="-78" stroke="${COL[k]||COL.x}" stroke-width="8"/>`; }
+  if(k==='boss') g+=`<polygon points="0,-78 -4,-70 0,-58 4,-70" fill="#c23b2e" stroke-width="1.5"/>`;
+  // head
+  g+=`<g transform="rotate(${hr} 0 -82)"><circle cx="0" cy="${hy}" r="${hrad}" fill="#fff"/>`;
+  if(!o.back){
+    const lk=(o.look||0)*2.2;
+    g+=`<circle cx="${-5+lk}" cy="${hy-2}" r="1.8" fill="${K}" stroke="none"/><circle cx="${5+lk}" cy="${hy-2}" r="1.8" fill="${K}" stroke="none"/>`;
+    const m=o.m||'smile', my=hy+7;
+    if(m==='smile') g+=`<path d="M-5,${my} Q0,${my+4} 5,${my}" stroke-width="2"/>`;
+    else if(m==='flat') g+=`<path d="M-4,${my+1} L4,${my+1}" stroke-width="2"/>`;
+    else if(m==='frown') g+=`<path d="M-5,${my+3} Q0,${my-2} 5,${my+3}" stroke-width="2"/>`;
+    else g+=`<ellipse cx="0" cy="${my+1}" rx="3" ry="${2+Math.abs(Math.sin((o.tt||0)*12))*2.5}" fill="${K}" stroke-width="1.5"/>`;
+    if(k==='boss') g+=`<circle cx="-5" cy="${hy-2}" r="4.6" stroke-width="1.6"/><circle cx="5" cy="${hy-2}" r="4.6" stroke-width="1.6"/><line x1="-0.4" y1="${hy-2}" x2="0.4" y2="${hy-2}" stroke-width="1.6"/>`;
+  }
+  if(k==='eng'||o.cap) g+=`<path d="M-14,${hy-2} A14,14 0 0 1 14,${hy-2} Z" fill="#8c8c8c" stroke-width="2.5"/><line x1="6" y1="${hy-2}" x2="21" y2="${hy}" stroke-width="3"/>`;
+  if(k==='wife') g+=`<circle cx="0" cy="${hy-18}" r="7" fill="${K}"/>`;
+  if(k==='old') g+=`<path d="M-13,${hy-4} Q0,${hy-22} 13,${hy-4}" stroke="#d6d6d6" stroke-width="5"/>`;
+  if(o.band) g+=`<line x1="-13" y1="${hy-6}" x2="13" y2="${hy+1}" stroke="#dcdcdc" stroke-width="5"/>`;
+  g+=`</g>`;
+  if(k==='old'){ g+=`<line x1="${h2[0]}" y1="${h2[1]}" x2="${h2[0]+5}" y2="0" stroke="#7a5632" stroke-width="3.5"/>`; }
+  if(o.extra) g+=o.extra;
+  g+=`</g>`;
+  return `<g opacity="${op}" transform="translate(${x} ${y}) rotate(${rot}) scale(${s*d} ${s*sy})">${g}</g>`;
+}
+
+function bgStreet(sky='#ead9b5'){
+  let g=`<rect width="360" height="640" fill="${sky}"/>`;
+  const cols=['#9c7a55','#8b6a49','#a98963'];
+  [[-10,110,260],[100,120,200],[215,100,290],[300,90,230]].forEach(([x,w,h],i)=>{
+    g+=`<rect x="${x}" y="${470-h}" width="${w}" height="${h}" fill="${cols[i%3]}" stroke="${K}" stroke-width="3"/>`;
+    for(let r=0;r<Math.floor(h/60);r++)for(let c=0;c<2;c++) g+=`<rect x="${x+14+c*(w/2-4)}" y="${470-h+16+r*56}" width="24" height="30" fill="#e8dcc0" stroke="${K}" stroke-width="2"/>`;
+  });
+  g+=`<rect y="470" width="360" height="170" fill="#c9b48a"/><line x1="0" y1="470" x2="360" y2="470" stroke="${K}" stroke-width="3"/>`;
+  return g;
+}
+function bgOffice(){
+  return `<rect width="360" height="640" fill="#e6d6b8"/><rect y="470" width="360" height="170" fill="#b99a70"/><line x1="0" y1="470" x2="360" y2="470" stroke="${K}" stroke-width="3"/>`;
+}
+const flash=(op)=>`<rect width="360" height="640" fill="#fff" opacity="${clamp(op)}"/>`;
+const deskTop=(x,y,w)=>`<rect x="${x}" y="${y}" width="${w}" height="14" fill="#8a6339" stroke="${K}" stroke-width="3"/>`;
+const deskFront=(x,y,w,h)=>`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#7a5632" stroke="${K}" stroke-width="3"/>`;
+function clock(cx,cy,txt){return `<circle cx="${cx}" cy="${cy}" r="34" fill="#fff" stroke="${K}" stroke-width="3"/><text x="${cx}" y="${cy+6}" font-size="17" font-weight="700" text-anchor="middle" fill="${K}">${txt}</text>`;}
+function sign(x,y,txt){return `<line x1="${x}" y1="${y}" x2="${x}" y2="${y+110}" stroke="#7a5632" stroke-width="6"/><rect x="${x-26}" y="${y-36}" width="52" height="44" rx="5" fill="#fff" stroke="${K}" stroke-width="3"/><text x="${x}" y="${y-5}" font-size="30" font-weight="800" text-anchor="middle" fill="${K}">${txt}</text>`;}
+
+const scenes=[
+{text:"August 6, 1945. Hiroshima, Japan. At 8:15 a.m., a young shipyard engineer walks toward his office.",
+ draw:(p,t)=>{let g=bgStreet();
+  g+=`<g transform="translate(18,70)"><rect width="64" height="76" rx="6" fill="#fff" stroke="${K}" stroke-width="3"/><rect width="64" height="20" rx="6" fill="#c0504d" stroke="${K}" stroke-width="3"/><text x="32" y="60" font-size="38" font-weight="800" text-anchor="middle" fill="${K}">6</text></g>`;
+  g+=`<line x1="305" y1="150" x2="305" y2="470" stroke="${K}" stroke-width="6"/>`+clock(305,120,'8:15');
+  g+=fig('eng',lerp(40,240,p),FY,{w:t*7,s:1.05});return g;}},
+{text:"A white flash throws him to the ground and burns his skin.",
+ draw:(p,t)=>{let g=bgStreet();
+  const f=clamp((p-.3)/.15), fall=ease(clamp((p-.42)/.3));
+  g+=fig('eng',lerp(170,250,fall),FY,{s:1.05,rot:fall*85,still:p>.4,red:fall>.5,m:fall>.3?'frown':'smile',a1:fall*100,a2:-fall*60,w:t*7});
+  g+=flash(p<.5?f:1-(p-.5)/.5*.9);return g;}},
+{text:"He spends the night in a crowded shelter, hearing only a loud ringing.",
+ draw:(p,t)=>{let g=`<rect width="360" height="640" fill="#5f5040"/><rect y="0" width="360" height="70" fill="#3f3328"/><line x1="0" y1="70" x2="360" y2="70" stroke="${K}" stroke-width="4"/><rect y="500" width="360" height="140" fill="#7a6650"/><line x1="0" y1="500" x2="360" y2="500" stroke="${K}" stroke-width="3"/>`;
+  [[40,500],[110,510],[250,505],[320,512]].forEach(([x,y],i)=>{g+=fig('x',x,y+30,{s:.75,sit:true,still:true,m:'flat',d:i%2?-1:1,op:.95});});
+  g+=fig('eng',180,FY+30,{s:1.15,sit:true,still:true,m:'frown',h1:[-16,-92],h2:[16,-92],band:false});
+  for(let i=0;i<3;i++){const r=26+((t*28+i*14)%42);g+=`<circle cx="180" cy="${FY+30-96*1.15}" r="${r}" fill="none" stroke="#fff" stroke-width="2" opacity="${clamp(1-(r-26)/42)*.7}"/>`;}
+  return g;}},
+{text:"Then he squeezes onto a packed train, because his family waits in Nagasaki.",
+ draw:(p,t)=>{let g=`<rect width="360" height="640" fill="#dcd0b2"/><rect y="470" width="360" height="170" fill="#a9a08a"/><line x1="0" y1="470" x2="360" y2="470" stroke="${K}" stroke-width="3"/>`;
+  g+=`<rect x="120" y="320" width="260" height="170" rx="10" fill="#6f7f8c" stroke="${K}" stroke-width="3"/>`;
+  for(let i=0;i<3;i++){g+=`<rect x="${210+i*52}" y="340" width="40" height="40" fill="#e8dcc0" stroke="${K}" stroke-width="2.5"/><circle cx="${230+i*52}" cy="368" r="9" fill="#fff" stroke="${K}" stroke-width="2"/>`;}
+  g+=`<rect x="140" y="345" width="56" height="145" fill="#2a2622" stroke="${K}" stroke-width="3"/>`;
+  const x=lerp(30,168,clamp(p/.72));
+  g+=fig('eng',x,FY-10,{w:t*7,s:1,op:p>.72?clamp(1-(p-.72)/.1):1,still:p>.72});
+  const dw=p>.78?clamp((p-.78)/.2)*56:0; g+=`<rect x="140" y="345" width="${dw}" height="145" fill="#6f7f8c" stroke="${K}" stroke-width="3"/>`;
+  g+=`<rect x="0" y="490" width="360" height="12" fill="#5d5648"/>`;return g;}},
+{text:"He reaches Nagasaki, where his wife and baby son are waiting at the door.",
+ draw:(p,t)=>{let g=bgStreet('#efdfba');
+  g+=`<rect x="170" y="300" width="190" height="240" fill="#a07a50" stroke="${K}" stroke-width="3"/><polygon points="160,300 265,230 370,300" fill="#6b4f33" stroke="${K}" stroke-width="3"/><rect x="235" y="380" width="64" height="160" fill="#2f2923" stroke="${K}" stroke-width="3"/>`;
+  g+=fig('wife',267,FY,{s:1,still:true,h1:[-26,-60],h2:[18,-50]});
+  g+=fig('baby',296,FY-52,{s:.42,still:true,m:'smile'});
+  g+=fig('eng',lerp(30,150,clamp(p/.75)),FY+8,{w:t*7,s:1.05,still:p>.75});return g;}},
+{text:"Three days after Hiroshima, he walks into his office, still wrapped in bandages.",
+ draw:(p,t)=>{let g=bgOffice();
+  g+=`<rect x="60" y="150" width="240" height="190" fill="#c8d6dc" stroke="${K}" stroke-width="3"/><line x1="180" y1="150" x2="180" y2="340" stroke="${K}" stroke-width="3"/>`;
+  g+=deskTop(80,390,200)+deskFront(90,404,180,70);
+  g+=fig('eng',180,lerp(640,500,p),{s:lerp(1.7,1.0,p),back:true,band:true,w:t*6});return g;}},
+{text:"His boss listens to the story of Hiroshima, then shakes his head.",
+ draw:(p,t)=>{let g=bgOffice();
+  g+=fig('boss',250,470,{s:1.15,still:true,m:'flat',hr:p>.4?Math.sin(t*9)*13:0});
+  g+=deskTop(150,420,200)+deskFront(158,434,184,80);
+  g+=fig('eng',90,FY+10,{s:1.15,still:true,band:true,m:'flat',d:1});return g;}},
+{text:"“One bomb cannot destroy a whole city,” his boss says, frowning across the desk.",
+ draw:(p,t)=>{let g=bgOffice();
+  g+=fig('boss',180,590,{s:1.9,still:true,m:'open',tt:t,h1:[40,-30],h2:[-30,-60],hr:Math.sin(t*3)*3});
+  g+=deskTop(0,500,360)+deskFront(0,514,360,130);return g;}},
+{text:"He does not explain.",
+ draw:(p,t)=>{let g=bgOffice();
+  g+=fig('eng',180,590,{s:lerp(1.6,1.85,p),still:true,m:'flat',band:true,h1:[-16,-52],h2:[22,-48]});
+  g+=deskTop(0,500,360)+deskFront(0,514,360,130);return g;}},
+{text:"Then, at 11:02 a.m., a second white flash fills the office window.",
+ draw:(p,t)=>{let g=bgOffice();
+  const lit=p>.35?clamp((p-.35)/.3):0;
+  g+=`<rect x="90" y="140" width="180" height="210" fill="#9fc3d6" stroke="${K}" stroke-width="4"/><rect x="90" y="140" width="180" height="210" fill="#fff" opacity="${lit}"/><line x1="180" y1="140" x2="180" y2="350" stroke="${K}" stroke-width="3"/><line x1="90" y1="245" x2="270" y2="245" stroke="${K}" stroke-width="3"/>`;
+  g+=clock(310,90,'11:02');
+  g+=deskTop(40,430,280)+deskFront(50,444,260,70);
+  g+=`<circle cx="180" cy="245" r="${clamp((p-.55)/.45)*520}" fill="#fff" opacity=".95"/>`;return g;}},
+{text:"Glass shatters across the office, and every desk shakes under the blast.",
+ draw:(p,t)=>{let g=bgOffice();const j=(1-p)*5;
+  g+=`<g transform="translate(${Math.sin(t*45)*j} ${Math.cos(t*38)*j})">`;
+  g+=`<rect x="90" y="140" width="180" height="210" fill="#fff" stroke="${K}" stroke-width="4"/>`;
+  g+=fig('boss',250,470,{s:1.1,sy:.65,still:true,m:'frown'});
+  g+=deskTop(140,430,200)+deskFront(148,444,184,70);
+  g+=fig('eng',80,FY+10,{s:1.1,sy:.65,still:true,m:'frown',band:true});
+  g+=`</g>`;
+  for(let i=0;i<12;i++){const a=i*2.4,dist=ease(clamp(p*1.1))*(80+i*18),sc=.4+p*(1.4+i*.1);
+    const x=180+Math.cos(a)*dist*(1+i*.05),y=245+Math.sin(a)*dist*1.1;
+    g+=`<polygon points="0,-14 10,8 -9,6" transform="translate(${x} ${y}) rotate(${i*40+p*200}) scale(${sc})" fill="#cfe6f0" stroke="${K}" stroke-width="2" opacity="${1-p*.3}"/>`;}
+  return g;}},
+{text:"You see, both bombs exploded about 3 kilometers from where he stood.",
+ draw:(p,t)=>{let g=`<rect width="360" height="640" fill="#eadcb8"/><ellipse cx="60" cy="470" rx="230" ry="110" fill="#c1ad7c" stroke="${K}" stroke-width="3"/><ellipse cx="320" cy="480" rx="220" ry="120" fill="#b49e6c" stroke="${K}" stroke-width="3"/><polygon points="140,640 220,640 195,440 165,440" fill="#d9c9a0" stroke="${K}" stroke-width="3"/>`;
+  g+=sign(60,380,'3')+sign(300,380,'3');
+  const lk=p<.5?-1:1;
+  g+=fig('eng',180,FY+60,{s:1.15,still:true,look:lk,hr:lk*10,m:'flat'});return g;}},
+{text:"His wife and baby son also survive, and the family stays together.",
+ draw:(p,t)=>{let g=bgStreet('#f0e1bd');
+  g+=`<rect x="70" y="250" width="220" height="290" fill="#a07a50" stroke="${K}" stroke-width="3"/><rect x="110" y="300" width="140" height="240" fill="#2f2923" stroke="${K}" stroke-width="3"/>`;
+  const b=Math.sin(t*2)*1.5;
+  g+=fig('wife',165,FY+b,{s:1.15,still:true,h1:[-30,-62],h2:[24,-52]});
+  g+=fig('baby',198,FY-62+b,{s:.5,still:true,m:'smile'});
+  g+=fig('eng',238,FY+b,{s:1.15,still:true,d:-1,h2:[-30,-64],band:true,m:'smile'});return g;}},
+{text:"For decades he speaks at podiums, begging the world to end nuclear weapons.",
+ draw:(p,t)=>{let g=`<rect width="360" height="640" fill="#d8c8a6"/><rect x="0" y="0" width="70" height="470" fill="#8f3d3a" stroke="${K}" stroke-width="3"/><rect x="290" y="0" width="70" height="470" fill="#8f3d3a" stroke="${K}" stroke-width="3"/><rect y="440" width="360" height="40" fill="#8a6339" stroke="${K}" stroke-width="3"/>`;
+  const wv=Math.sin(t*3)*6;
+  g+=fig('eng',170,505,{s:1.0,still:true,m:'open',tt:t,h1:[-38,-108+wv],h2:[38,-108-wv]});
+  g+=`<rect x="130" y="400" width="100" height="120" fill="#7a5632" stroke="${K}" stroke-width="3"/><line x1="200" y1="400" x2="200" y2="382" stroke="${K}" stroke-width="4"/><circle cx="200" cy="378" r="7" fill="#444" stroke="${K}" stroke-width="2"/>`;
+  g+=`<rect y="520" width="360" height="120" fill="#a98f66"/>`;
+  for(let r=0;r<3;r++)for(let c=0;c<7;c++){g+=`<circle cx="${25+c*51+(r%2)*20}" cy="${560+r*34}" r="${15+r*3}" fill="#2a2622" stroke="#000" stroke-width="2"/>`;}
+  return g;}},
+{text:"Finally, an official stamps his papers and names him a survivor of both bombs.",
+ draw:(p,t)=>{let g=bgOffice();
+  g+=fig('eng',255,470,{s:.95,still:true,band:true,m:'smile'});
+  g+=deskTop(0,430,360)+deskFront(0,444,360,196);
+  const px=p>.7?ease((p-.7)/.3)*60:0, py=p>.7?-ease((p-.7)/.3)*14:0;
+  g+=`<g transform="translate(${px} ${py})"><polygon points="130,438 240,438 258,412 148,412" fill="#fff" stroke="${K}" stroke-width="3"/>${p>.45?`<circle cx="190" cy="425" r="9" fill="none" stroke="#c23b2e" stroke-width="4"/>`:''}</g>`;
+  const sy=p<.4?lerp(300,408,ease(p/.4)):p<.5?408:lerp(408,300,ease((p-.5)/.4));
+  g+=`<g transform="translate(${190+px*(p>.7?1:0)} ${sy})"><rect x="-10" y="-34" width="20" height="22" rx="4" fill="#6b4f33" stroke="${K}" stroke-width="3"/><rect x="-16" y="-12" width="32" height="10" fill="#8a6339" stroke="${K}" stroke-width="3"/></g>`;
+  g+=`<path d="M-20,640 L-20,560 Q10,500 70,505 Q120,520 130,560 L135,640 Z" fill="${COL.off}" stroke="${K}" stroke-width="4"/><circle cx="60" cy="470" r="38" fill="#fff" stroke="${K}" stroke-width="4"/><rect x="96" y="540" width="34" height="14" fill="#e8892b" stroke="${K}" stroke-width="2"/>`;
+  return g;}},
+{text:"In his old age, he sits at a quiet table, holding the official paper.",
+ draw:(p,t)=>{const z=lerp(1.25,1.6,p);let g=`<rect width="360" height="640" fill="#efd7aa"/>`;
+  g+=`<polygon points="40,120 150,120 290,520 100,520" fill="#fff3c8" opacity=".45"/><rect x="40" y="60" width="170" height="210" fill="#ffe9a8" stroke="${K}" stroke-width="4"/><line x1="125" y1="60" x2="125" y2="270" stroke="${K}" stroke-width="3"/><line x1="40" y1="165" x2="210" y2="165" stroke="${K}" stroke-width="3"/>`;
+  g+=`<rect y="470" width="360" height="170" fill="#b99a70"/><line x1="0" y1="470" x2="360" y2="470" stroke="${K}" stroke-width="3"/>`;
+  g+=fig('old',200,560,{s:z,still:true,m:'smile',h1:[-18,-60],h2:[16,-60],extra:`<rect x="-22" y="-78" width="44" height="32" fill="#fff" stroke="${K}" stroke-width="3"/><circle cx="0" cy="-62" r="8" fill="none" stroke="#c23b2e" stroke-width="3"/>`});
+  g+=`<rect x="30" y="${560-48*z}" width="300" height="16" fill="#8a6339" stroke="${K}" stroke-width="3"/>`;
+  g+=`<rect x="40" y="${560-48*z+16}" width="280" height="${160}" fill="#7a5632" stroke="${K}" stroke-width="3"/>`;
+  return g;}}
+];
+scenes.forEach(s=>{const n=s.text.split(/\s+/).length;s.dur=Math.max(3.6,n/2.6);});
+
+const stage=document.getElementById('stage'),cap=document.getElementById('cap'),pp=document.getElementById('pp'),
+  prog=document.querySelector('#prog i'),count=document.getElementById('count'),voiceBtn=document.getElementById('voice'),start=document.getElementById('start');
+let idx=0,t=0,playing=false,last=performance.now(),voice=false,begun=false;
+const total=scenes.reduce((a,s)=>a+s.dur,0);
+function speak(){ if(!voice)return; try{ speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(scenes[idx].text); u.rate=1.02; speechSynthesis.speak(u);}catch(e){} }
+function onScene(){ cap.textContent=scenes[idx].text; count.textContent=(idx+1)+'/'+scenes.length; speak(); }
+function setBtn(){ pp.textContent=playing?'Pause':(idx===scenes.length-1&&t>=scenes[idx].dur-.05?'Replay':'Play'); }
+function go(i){ idx=clamp(i,0,scenes.length-1); t=0; onScene(); }
+function frame(ts){
+  const dt=Math.min(.1,(ts-last)/1000); last=ts;
+  if(playing){ t+=dt; const sc=scenes[idx];
+    if(t>=sc.dur){ if(idx<scenes.length-1){ idx++; t=0; onScene(); } else { playing=false; t=sc.dur; setBtn(); } } }
+  const sc=scenes[idx];
+  try{ stage.innerHTML=sc.draw(clamp(t/sc.dur),t); }catch(e){ console.log(e); }
+  let done=0; for(let i=0;i<idx;i++) done+=scenes[i].dur; prog.style.width=((done+t)/total*100)+'%';
+  requestAnimationFrame(frame);
+}
+start.addEventListener('click',()=>{ start.style.display='none'; begun=true; playing=true; go(0); setBtn(); });
+pp.addEventListener('click',()=>{ if(idx===scenes.length-1&&t>=scenes[idx].dur-.05){ go(0); playing=true; } else playing=!playing; if(!playing){try{speechSynthesis.cancel();}catch(e){}} setBtn(); });
+document.getElementById('prev').addEventListener('click',()=>{ go(idx-(t>1.5?0:1)); if(!begun){start.style.display='none';begun=true;} setBtn(); });
+document.getElementById('next').addEventListener('click',()=>{ go(idx+1); if(!begun){start.style.display='none';begun=true;} setBtn(); });
+voiceBtn.addEventListener('click',()=>{ voice=!voice; voiceBtn.classList.toggle('on',voice); if(voice) speak(); else { try{speechSynthesis.cancel();}catch(e){} } });
+document.addEventListener('keydown',e=>{ if(e.key==='ArrowRight')document.getElementById('next').click(); if(e.key==='ArrowLeft')document.getElementById('prev').click(); if(e.key===' '){e.preventDefault();pp.click();} });
+cap.textContent=scenes[0].text; pp.textContent='Play';
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
